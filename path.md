@@ -4,6 +4,10 @@ tagline: path manipulation
 
 ## `local path = require'path'`
 
+Path manipulation library for Windows and UNIX spaths. Parses all Windows
+path formats including long paths (`\\?\`), device paths (`\\.\`)
+and UNC paths.
+
 ### API
 
 ------------------------------------------------ ------------------------------------------------
@@ -11,8 +15,8 @@ tagline: path manipulation
 `path.sep([pl]) -> s`                            get the default separator for a platform
 `path.dev_alias(s) -> s`                         check if a path is a Windows device alias
 `path.type(s, [pl]) -> type`                     get the path type
-`path.parse(s, [pl]) -> type, path, drv|srv|nil` split path depending on type
-`path.format(type, path, drv|srv) -> s`          put together a path
+`path.parse(s, [pl]) -> type, path[, drv|srv]    split path depending on type
+`path.format(type, path, [drv|srv]) -> s`        put together a path
 `path.separator(s, [pl], [which], [sep]) -> s`   get/add/set/detect the start/end/all separators
 `path.common(p1, p2, [pl]) -> s`                 get the common prefix between two paths
 `path.basename(s, [pl]) -> s`                    get the last component from a path
@@ -41,25 +45,34 @@ Check if a path is a Windows device alias and if it is, return that alias.
 
 ## `path.type(s, [pl]) -> type`
 
-Get the path type which can be: `'abs'`, `'abs_long'`, `'abs_nodrive'`,
-`'rel'`, `'rel_drive'`, `'unc'`, `'unc_long'`, `'global'`, `'dev'`,
-`'dev_alias'`.
+Get the path type which can be:
 
-The empty path ('') comes off as type 'rel'.
+* `'abs'` - `C:\path` (Windows) or `/path` (UNIX)
+* `'abs_long'` - `\\?\C:\path` (Windows)
+* `'abs_nodrive'` - `\path` (Windows)
+* `'rel'` - `a\b`, `a/b`, `''`, etc. (Windows, UNIX)
+* `'rel_drive'` - `C:a\b` (Windows)
+* `'unc'` - `\\server\share\path` (Windows)
+* `'unc_long'` - `\\?\UNC\server\share\path` (Windows)
+* `'global'` - `\\?\path` (Windows)
+* `'dev'` - `\\.\path` (Windows)
+* `'dev_alias'`: `CON`, `c:\path\nul.txt`, etc. (Windows)
+
+The empty path (`''`) comes off as type `'rel'`.
 
 The only paths that are portable between Windows and UNIX (Linux, OSX)
 without translation are type `'rel'` paths using forward slashes only which
 are no longer than 259 bytes and which don't contain any control characters
 (code 0-31) or the symbols `<>:"|%?*\`.
 
-## `path.parse(s, [pl]) -> type, path, drive|server|nil`
+## `path.parse(s, [pl]) -> type, path[, drive|server]`
 
 Split a path into its local path component and, depending on the path type,
 the drive letter or server name.
 
 UNC paths are not validated and can have and empty server or path.
 
-## `path.format(type, path, drv|srv) -> s`
+## `path.format(type, path, [drive|server]) -> s`
 
 Put together a path from its broken-down components. No validation is done.
 
@@ -80,12 +93,14 @@ otherwise the default platform separator is used.
 Removing duplicate separators without normalizing the separators is possible
 by passing `'%1'` to `sep`.
 
-__NOTE:__ Setting '\' on a UNIX path may result in an invalid path because
-`\` is a valid character in UNIX filenames!
+__NOTE:__ Setting the separator as `\` on a UNIX path may result in an
+invalid path because `\` is a valid character in UNIX filenames!
 
-__NOTE:__ Removing a separator on `/` makes the path relative!
+__NOTE:__ Removing a separator on the path `'/'` changes the path type
+because it makes the path relative.
 
-__NOTE:__ Adding a separator to `''` (which is `'.'`) makes the path absolute!
+__NOTE:__ Adding a separator to the empty path (`''`, which can be seen
+as `'.'`) changes the path type because it makes the path absolute.
 
 ## `path.common(p1, p2, [pl]) -> s`
 
