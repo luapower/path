@@ -76,9 +76,10 @@ test('a/\\\\//b\\\\//c', 'a/b\\c', 'win', 'all', '%1')
 
 local function test(a, b, pl, c2)
 	local c1 = path.common(a, b, pl)
-	print('common', a, b, '->', c1)
+	print('common', a, b, pl, '->', c1)
 	assert(c1 == c2)
 end
+
 test('', '', 'win', '')
 test('/', '/', 'win', '/')
 test('/', '\\', 'win', '/') --first when equal
@@ -95,6 +96,10 @@ test('/a/b/', '/a/b/c', 'win', '/a/b/')
 test('/a/b', '/a/bc', 'win', '/a/')
 test('/a//', '/a//', 'win', '/a//')
 test('/a/c/d', '/a/b/f', 'win', '/a/')
+
+--case-sensitivity
+test('a/B', 'a/b', 'unix', 'a/')
+test('a/B', 'a/b', 'win', 'a/B')
 
 --basename -------------------------------------------------------------------
 

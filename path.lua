@@ -205,25 +205,31 @@ function path.common(p1, p2, pl)
 	local win = win(pl)
 	local type1, p1, drive1 = path.parse(p1, pl)
 	local type2, p2, drive2 = path.parse(p2, pl)
+	local p = #p1 <= #p2 and p1 or p2
+	if win then --make the search case-insensitive and normalize separators
+		drive1 = drive1 and drive1:lower()
+		drive2 = drive2 and drive2:lower()
+		p1 = p1:lower():gsub('/', '\\')
+		p2 = p2:lower():gsub('/', '\\')
+	end
 	if type1 ~= type2 or drive1 ~= drive2 or p1 == '' or p2 == '' then
 		return ''
 	end
-	local s1, s2 = (win and '\\/' or '/'):byte(1, 2)
+	local sep = (win and '\\' or '/'):byte(1, 1)
 	local si = 0 --index where the last common separator was found
-	local p = #p1 <= #p2 and p1 or p2
 	for i = 1, #p + 1 do
 		local c1 = p1:byte(i, i)
 		local c2 = p2:byte(i, i)
-		local sep1 = c1 == nil or c1 == s1 or c1 == s2
-		local sep2 = c2 == nil or c2 == s1 or c2 == s2
+		local sep1 = c1 == nil or c1 == sep
+		local sep2 = c2 == nil or c2 == sep
 		if sep1 and sep2 then
 			si = i
 		elseif c1 ~= c2 then
 			break
 		end
 	end
-	p = p:sub(1, si)
-	return path.format(type1, p, drive1)
+	local p1 = p:sub(1, si)
+	return path.format(type1, p1, drive1)
 end
 
 --get the last path component of a path.
