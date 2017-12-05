@@ -96,11 +96,11 @@ by passing `'%1'` to `sep`.
 __NOTE:__ Setting the separator as `\` on a UNIX path may result in an
 invalid path because `\` is a valid character in UNIX filenames!
 
-__NOTE:__ Removing a separator on the path `'/'` changes the path type
-because it makes the path relative.
+__NOTE:__ Removing the starting separator on a root path (`'/'`, `'C:\'`)
+makes the path relative, which is probably not be what you want.
 
 __NOTE:__ Adding a separator to the empty path (`''`, which can be seen
-as `'.'`) changes the path type because it makes the path absolute.
+as `'.'`) makes the path absolute, which is probably not be what you want.
 
 ## `path.common(p1, p2, [pl]) -> s`
 
