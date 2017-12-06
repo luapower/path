@@ -1,105 +1,132 @@
 local path = require'path'
 
+--isabs ----------------------------------------------------------------------
+
+local function test(s, pl, isabs2, isempty2)
+	local isabs1, isempty1 = path.isabs(s, pl)
+	print('isabs', s, pl, '->', isabs1, isempty1)
+	assert(isabs1 == isabs2)
+	assert(isempty1 == isempty2)
+end
+
+test('',     'win', false, true)
+test('/',    'win', true,  true)
+test('\\//', 'win', true,  true)
+test('C:',   'win', false, true)
+test('C:/',  'win', true,  true)
+test('C:/a', 'win', true,  false)
+test('a',    'win', false, false)
+test('C:/path/con.txt', 'win', false, false) --device alias but appears abs
+
+test('\\\\', 'win', true, nil) --invalid
+test('\\\\server', 'win', true, nil) --invalid
+test('\\\\server\\', 'win', true, true) --still invalid but better :)
+test('\\\\server\\share', 'win', true, false) --valid
+
+test('/', 'unix', true, true)
+test('', 'unix', false, true)
+
 --separator ------------------------------------------------------------------
 
-local function test(s, s2, pl, which, sep, repl_only)
-	local s1 = path.separator(s, pl, which, sep, repl_only)
+local function test(s, s2, pl, which, sep)
+	local s1 = path.separator(s, pl, which, sep)
 	print('sep',
-		s, pl, which, sep, repl_only and 'repl' or 'set', '->', s1)
+		s, pl, which, sep, '->', s1)
 	assert(s1 == s2)
 end
 
 --empty paths
-test('',     '\\',    'win', '+start', '\\')
-test('',     '\\',    'win', '+end',   '\\')
-test('',     '',      'win', 'start',  '\\')
-test('',     '',      'win', 'end',    '\\')
-test('',     '',      'win', 'all',    '\\')
+test('C:',     'C:',      'win', 'start',  '\\')
+test('C:',     'C:',      'win', 'end',    '\\')
+test('C:',     'C:',      'win', 'all',    '\\')
 
 --duplicate separators / set
-test('/\\/', '/',     'win', 'start', '/')
-test('/\\/', '/',     'win', 'end',   '/')
-test('/\\/', '/',     'win', 'all',   '/')
+test('C:/\\/', 'C:/',     'win', 'start', '/')
+test('C:/\\/', 'C:/',     'win', 'end',   '/')
+test('C:/\\/', 'C:/',     'win', 'all',   '/')
 
 --duplicate separators / remove
-test('/\\/', '',     'win', 'start', '')
-test('/\\/', '',     'win', 'end',   '')
-test('/\\/', '',     'win', 'all',   '')
+test('C:/\\/a/\\/', 'C:/a/\\/', 'win', 'start', '')
+test('C:/\\/a/\\/', 'C:/\\/a/', 'win', 'end',   '')
+test('C:/\\/a/\\/', 'C:/a/',    'win', 'all',   '')
 
 --add/change separator
-test('a/b',  '\\a/b', 'win', '+start', '\\')
-test('/a/b', '\\a/b', 'win', '+start', '\\')
-test('a/b',  'a/b\\', 'win', '+end',   '\\')
-test('a/b/', 'a/b\\', 'win', '+end',   '\\')
+test('C:a/b',  'C:\\a/b', 'win', '+start', '\\')
+test('C:/a/b', 'C:\\a/b', 'win', '+start', '\\')
+test('C:a/b',  'C:a/b\\', 'win', '+end',   '\\')
+test('C:a/b/', 'C:a/b\\', 'win', '+end',   '\\')
 
 --replace sepaqrator
-test('a/b',  'a/b',   'win', 'start', '\\')
-test('/a/b', '\\a/b', 'win', 'start', '\\')
-test('a/b',  'a/b',   'win', 'end',   '\\')
-test('a/b/', 'a/b\\', 'win', 'end',   '\\')
+test('C:a/b',  'C:a/b',   'win', 'start', '\\')
+test('C:/a/b', 'C:\\a/b', 'win', 'start', '\\')
+test('C:a/b',  'C:a/b',   'win', 'end',   '\\')
+test('C:a/b/', 'C:a/b\\', 'win', 'end',   '\\')
 
 --remove separator
-test('a/b/',  'a/b/', 'win', '+start', '')
-test('/a/b/', 'a/b/', 'win', '+start', '')
-test('a/b/',  'a/b/', 'win', 'start' , '')
-test('/a/b/', 'a/b/', 'win', 'start' , '')
-test('/a/b',  '/a/b', 'win', '+end'  , '')
-test('/a/b/', '/a/b', 'win', '+end'  , '')
-test('/a/b',  '/a/b', 'win', 'end'   , '')
-test('/a/b/', '/a/b', 'win', 'end'   , '')
+test('C:a/b/',  'C:a/b/', 'win', '+start', '')
+test('C:/a/b/', 'C:a/b/', 'win', '+start', '')
+test('C:a/b/',  'C:a/b/', 'win', 'start' , '')
+test('C:/a/b/', 'C:a/b/', 'win', 'start' , '')
+test('C:/a/b',  'C:/a/b', 'win', '+end'  , '')
+test('C:/a/b/', 'C:/a/b', 'win', '+end'  , '')
+test('C:/a/b',  'C:/a/b', 'win', 'end'   , '')
+test('C:/a/b/', 'C:/a/b', 'win', 'end'   , '')
 
 --replace with detected separator
-test('a/b',    '/a/b',    'win', '+start', true) --detected
-test('a\\b',   '\\a\\b',  'win', '+start', true) --detected
-test('a',      '\\a',     'win', '+start', true) --default
-test('a/b/c',  'a\\b\\c', 'win', 'all'   , true) --default (enforced)
-test('a/b\\c', 'a\\b\\c', 'win', 'all'   , true) --default
+test('C:a/b',    'C:/a/b',    'win', '+start', true) --detected
+test('C:a\\b',   'C:\\a\\b',  'win', '+start', true) --detected
+test('C:a',      'C:\\a',     'win', '+start', true) --default
+test('C:a/b/c',  'C:a\\b\\c', 'win', 'all'   , true) --default (enforced)
+test('C:a/b\\c', 'C:a\\b\\c', 'win', 'all'   , true) --default
 
 --find separator
-test('a/b', nil, 'win', 'start')
-test('a/b', nil, 'win', 'end')
-test('a/b', '',  'win', '+start')
-test('a/b', '',  'win', '+end')
-test('a/b' , '/' , 'win', 'all')
-test('a\\b', '\\', 'win', 'all')
-test('a/b' , '/' , 'win') --all
-test('a\\b', '\\', 'win') --all
-test('/a/b', '/', 'win', 'start')
-test('/a/b', '/', 'win', '+start')
-test('a/b/', '/', 'win', 'end')
-test('a/b/', '/', 'win', '+end')
+test('C:a/b', nil, 'win', 'start')
+test('C:a/b', nil, 'win', 'end')
+test('C:a/b', '',  'win', '+start')
+test('C:a/b', '',  'win', '+end')
+test('C:a/b' , '/' , 'win', 'all')
+test('C:a\\b', '\\', 'win', 'all')
+test('C:a/b' , '/' , 'win') --all
+test('C:a\\b', '\\', 'win') --all
+test('C:/a/b', '/', 'win', 'start')
+test('C:/a/b', '/', 'win', '+start')
+test('C:a/b/', '/', 'win', 'end')
+test('C:a/b/', '/', 'win', '+end')
 
 --remove duplicate separators only
-test('a/\\\\//b\\\\//c', 'a/b\\c', 'win', 'all', '%1')
+test('C:a/\\\\//b\\\\//c', 'C:a/b\\c', 'win', 'all', '%1')
 
---common ---------------------------------------------------------------------
+--commonpath -----------------------------------------------------------------
 
 local function test(a, b, pl, c2)
-	local c1 = path.common(a, b, pl)
-	print('common', a, b, pl, '->', c1)
+	local c1 = path.commonpath(a, b, pl)
+	print('commpre', a, b, pl, '->', c1)
 	assert(c1 == c2)
 end
 
-test('', '', 'win', '')
-test('/', '/', 'win', '/')
-test('/', '\\', 'win', '/') --first when equal
-test('////////', '//', 'win', '//')
-test('//', '////////', 'win', '//')
-test('/', '', 'win', '')
-test('', '/', 'win', '')
-test('a', '/', 'win', '')
-test('/a', '/b', 'win', '/')
-test('a', 'b', 'win', '')
-test('/a/b', '/a/c', 'win', '/a/')
-test('/a/b', '/a/b/', 'win', '/a/b')
-test('/a/b/', '/a/b/c', 'win', '/a/b/')
-test('/a/b', '/a/bc', 'win', '/a/')
-test('/a//', '/a//', 'win', '/a//')
-test('/a/c/d', '/a/b/f', 'win', '/a/')
+test('',         '',           'win', '')
+test('/',        '/',          'win', '/')
+test('C:',       'C:',         'win', 'C:')
+test('c:/',      'C:/',        'win', 'c:/') --first when equal
+test('C:/',      'C:\\',       'win', 'C:/') --first when equal
+test('C:////////', 'c://',     'win', 'c://') --smallest
+test('c://',     'C:////////', 'win', 'c://') --smallest
+test('C:/',      'C:',         'win', 'C:')
+test('C:',       'C:/',        'win', 'C:')
+test('C:a',      'C:/',        'win', 'C:')
+test('C:/a',     'C:/b',       'win', 'C:/')
+test('C:a',      'C:b',        'win', 'C:')
+test('C:/a/b',   'C:/a/c',     'win', 'C:/a/')
+test('C:/a/b',   'C:/a/b/',    'win', 'C:/a/b')
+test('C:/a/b/',  'C:/a/b/c',   'win', 'C:/a/b/')
+test('C:/a/b',   'C:/a/bc',    'win', 'C:/a/')
+test('C:/a//',   'C:/a//',     'win', 'C:/a//')
+test('C:/a/c/d', 'C:/a/b/f',   'win', 'C:/a/')
 
 --case-sensitivity
-test('a/B', 'a/b', 'unix', 'a/')
-test('a/B', 'a/b', 'win', 'a/B')
+test('a/B',     'a/b',       'unix', 'a/')
+test('C:a/B',   'C:a/b',     'win',  'C:a/B') --pick first
+test('C:a/B/c', 'C:a/b/c/d', 'win',  'C:a/B/c') --pick smallest
 
 --basename -------------------------------------------------------------------
 
@@ -123,6 +150,23 @@ local function test(s, pl, s2)
 	print('dirname', s, pl, '->', s1)
 	assert(s1 == s2)
 end
+
+--splitext -------------------------------------------------------------------
+
+local function test(s, pl, name2, ext2)
+	local name1, ext1 = path.splitext(s, pl)
+	print('ext', s, pl, '->', name1, ext1)
+	assert(name1 == name2)
+	assert(ext1 == ext2)
+end
+
+test('',             'win', '', nil)
+test('/',            'win', '', nil)
+test('a/',           'win', '', nil)
+test('/a/b/a',       'win', 'a', nil)
+test('/a/b/a.',      'win', 'a', '') --invalid filename on Windows
+test('/a/b/a.txt',   'win', 'a', 'txt')
+test('/a/b/.bashrc', 'win', '.bashrc', nil)
 
 --abs ------------------------------------------------------------------------
 

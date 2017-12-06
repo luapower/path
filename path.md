@@ -17,11 +17,13 @@ and UNC paths.
 `path.type(s, [pl]) -> type`                     get the path type
 `path.parse(s, [pl]) -> type, path[, drv|srv]    split path depending on type
 `path.format(type, path, [drv|srv]) -> s`        put together a path
+`path.isabs(s, [pl]) -> is_abs, is_empty`        check if path is absolute and if it's empty
+`path.endsep(s, [pl], [sep]) -> s, success`      get/add/remove ending separator
 `path.separator(s, [pl], [which], [sep]) -> s`   get/add/set/detect the start/end/all separators
-`path.common(p1, p2, [pl]) -> s`                 get the common prefix between two paths
+`path.commonpath(p1, p2, [pl]) -> s`             get the common base path between two paths
 `path.basename(s, [pl]) -> s`                    get the last component from a path
-`path.extname(s, [pl]) -> s`                     get the filename extension from a path
 `path.dirname(s, [pl]) -> s`                     get the path without basename
+`path.splitext(s, [pl]) -> name, ext`            split path's filename into name and extension
 `path.abs(s, pwd) -> s`                          convert relative path to absolute
 `path.rel(s, pwd) -> s`                          convert absolute path to relative
 `path.normalize(s, [pl], [opt]) -> s`            normalize a path in various ways
@@ -76,49 +78,55 @@ UNC paths are not validated and can have and empty server or path.
 
 Put together a path from its broken-down components. No validation is done.
 
-## `path.separator(s, [pl], [which], [sep]) -> s`
+## `path.isabs(s, [pl]) -> is_abs, is_empty`
 
-Get/add/set the start/end/all separators for a path or detect the separator
-used everywhere on the path if any.
+Check if a path is an absolute path or not, and if it's empty or not.
 
-If `sep` is missing, and `which` is missing too or `which` is `'all'`,
-the detected separator is returned, if any. Otherwise `which` can be
-`'start'` or `'end'` to return the starting or ending separator, if any.
-The starting, ending, or all separators can be changed if `sep` is given,
-but only if a separator already existed at that position. To force-add
-a starting or ending separator, `which` must be `'+start'` or `'+end'`.
-If `sep` is `true` then the path's separator is used if it's detected,
-otherwise the default platform separator is used.
+__NOTE:__ Absolute paths for which their local path is `''` are actually
+invalid (currently only incomplete UNC paths like `\\server` or `\\?` can be
+like that) but the function doesn't check for that specifically.
 
-Removing duplicate separators without normalizing the separators is possible
-by passing `'%1'` to `sep`.
+## `path.endsep(s, [pl], [sep]) -> s, success`
+
+Get/add/remove an ending separator. The arg `sep` can be `nil`, `true`,
+`false`, `'\\'`, `'/'`, `''`: if `sep` is `nil` or missing, the ending
+separator is returned (nil if missing), otherwise it is added or removed
+(`true` means detect separator to use, `false` means `''`). `success`
+is `false` if trying to add an ending slash to an empty relative path or
+trying to remove it from an absolute empty path, which are not allowed.
+
+## `path.separator(s, [pl], [sep]) -> s`
+
+Detect or set the a path's separator (for Windows paths only).
+
+The arg `sep` can be `nil`, `true` (platform default), `'\\'`, `'/'`,
+or `1` (remove duplicate separators without normalizing them).
 
 __NOTE:__ Setting the separator as `\` on a UNIX path may result in an
-invalid path because `\` is a valid character in UNIX filenames!
+invalid path because `\` is a valid character in UNIX filenames.
 
-__NOTE:__ Removing the starting separator on a root path (`'/'`, `'C:\'`)
-makes the path relative, which is probably not be what you want.
+## `path.commonpath(p1, p2, [pl]) -> s`
 
-__NOTE:__ Adding a separator to the empty path (`''`, which can be seen
-as `'.'`) makes the path absolute, which is probably not be what you want.
-
-## `path.common(p1, p2, [pl]) -> s`
-
-Get the common prefix (including the end separator) between two paths.
+Get the common base path (including the end separator) between two paths.
 
 ## `path.basename(s, [pl]) -> s`
 
 Get the last component from a path.
 If the path ends in a separator then the empty string is returned.
 
-## `path.extname(s, [pl]) -> s`
-
-Get the filename extension from a path, if any.
-
 ## `path.dirname(s, [pl]) -> s`
 
 Get the path without basename and separator. If the path ends in a separator
 then the whole path without the separator is returned.
+
+## `path.splitext(s, [pl]) -> name, ext`
+
+Split a path's filename into the name and extension parts like so:
+
+* `a.txt'` -> `'a'`, `'txt'`
+* `'.bashrc'' -> `'.bashrc'`, `nil`
+* `a'` -> `'a'`, `nil`
+* `'a.'` -> `'a'`, `''`
 
 ## `path.abs(s, pwd) -> s`
 
@@ -132,7 +140,8 @@ Convert an absolute path into relative path which is relative to `pwd`.
 
 Normalize a path in various ways, depending on `opt`:
 
-  *
+  * `dot_dirs`
+  * `dot_dot_dirs`
   *
 
 ## `path.filename(s, [pl], [repl]) -> s`
