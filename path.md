@@ -15,18 +15,20 @@ and UNC paths.
 `path.sep([pl]) -> s`                            get the default separator for a platform
 `path.dev_alias(s) -> s`                         check if a path is a Windows device alias
 `path.type(s, [pl]) -> type`                     get the path type
-`path.parse(s, [pl]) -> type, path[, drv|srv]    split path depending on type
-`path.format(type, path, [drv|srv]) -> s`        put together a path
+`path.parse(s, [pl]) -> type, path[, drv|srv]    break down a path to its basic parts
+`path.format(type, path, [drv|srv], pl) -> s`    put together a path from parsed parts
 `path.isabs(s, [pl]) -> is_abs, is_empty`        check if path is absolute and if it's empty
-`path.endsep(s, [pl], [sep]) -> s, success`      get/add/remove ending separator
-`path.separator(s, [pl], [which], [sep]) -> s`   get/add/set/detect the start/end/all separators
-`path.commonpath(p1, p2, [pl]) -> s`             get the common base path between two paths
+`path.endsep(s, [pl], [sep]) -> s, success`      get/add/remove the ending separator
+`path.separator(s, [pl], [sep], ...) -> s`       detect/set the path separator
 `path.basename(s, [pl]) -> s`                    get the last component from a path
+`path.splitext(s, [pl]) -> name, ext`            split path's basename into name and extension
 `path.dirname(s, [pl]) -> s`                     get the path without basename
-`path.splitext(s, [pl]) -> name, ext`            split path's filename into name and extension
-`path.abs(s, pwd) -> s`                          convert relative path to absolute
-`path.rel(s, pwd) -> s`                          convert absolute path to relative
+`path.gsplit(s, [pl], [full]) ->iter() ->s,sep`  iterate over path's components
 `path.normalize(s, [pl], [opt]) -> s`            normalize a path in various ways
+`path.commonpath(p1, p2, [pl]) -> s`             get the common base path between two paths
+`path.rel(s, pwd, [pl]) -> s`                    convert absolute path to relative
+`path.combine(p1, p2, [pl]) -> s`                combine two paths if possible
+`path.abs(s, pwd, [pl]) -> s`                    convert relative path to absolute
 `path.filename(s, [pl], [repl]) -> s`            validate/make-valid filename
 ------------------------------------------------ ------------------------------------------------
 
@@ -49,16 +51,16 @@ Check if a path is a Windows device alias and if it is, return that alias.
 
 Get the path type which can be:
 
-* `'abs'` - `C:\path` (Windows) or `/path` (UNIX)
-* `'abs_long'` - `\\?\C:\path` (Windows)
-* `'abs_nodrive'` - `\path` (Windows)
-* `'rel'` - `a\b`, `a/b`, `''`, etc. (Windows, UNIX)
-* `'rel_drive'` - `C:a\b` (Windows)
-* `'unc'` - `\\server\share\path` (Windows)
-* `'unc_long'` - `\\?\UNC\server\share\path` (Windows)
-* `'global'` - `\\?\path` (Windows)
-* `'dev'` - `\\.\path` (Windows)
-* `'dev_alias'`: `CON`, `c:\path\nul.txt`, etc. (Windows)
+  * `'abs'` - `C:\path` (Windows) or `/path` (UNIX)
+  * `'abs_long'` - `\\?\C:\path` (Windows)
+  * `'abs_nodrive'` - `\path` (Windows)
+  * `'rel'` - `a\b`, `a/b`, `''`, etc. (Windows, UNIX)
+  * `'rel_drive'` - `C:a\b` (Windows)
+  * `'unc'` - `\\server\share\path` (Windows)
+  * `'unc_long'` - `\\?\UNC\server\share\path` (Windows)
+  * `'global'` - `\\?\path` (Windows)
+  * `'dev'` - `\\.\path` (Windows)
+  * `'dev_alias'`: `CON`, `c:\path\nul.txt`, etc. (Windows)
 
 The empty path (`''`) comes off as type `'rel'`.
 
@@ -74,7 +76,7 @@ the drive letter or server name.
 
 UNC paths are not validated and can have and empty server or path.
 
-## `path.format(type, path, [drive|server]) -> s`
+## `path.format(type, path, [drive|server], [pl]) -> s`
 
 Put together a path from its broken-down components. No validation is done.
 
@@ -90,59 +92,92 @@ like that) but the function doesn't check for that specifically.
 
 Get/add/remove an ending separator. The arg `sep` can be `nil`, `true`,
 `false`, `'\\'`, `'/'`, `''`: if `sep` is `nil` or missing, the ending
-separator is returned (nil if missing), otherwise it is added or removed
-(`true` means detect separator to use, `false` means `''`). `success`
-is `false` if trying to add an ending slash to an empty relative path or
-trying to remove it from an absolute empty path, which are not allowed.
+separator is returned (`nil` if missing), otherwise it is added or removed
+(`true` means use path's separator or the default separator, `false` means
+`''`). `success` is `false` if trying to add an ending separator to an empty
+relative path or trying to remove it from an absolute empty path, which are
+not allowed.
 
-## `path.separator(s, [pl], [sep]) -> s`
+## `path.separator(s, [pl], [sep], [default_sep], [empty_names]) -> s`
 
 Detect or set the a path's separator (for Windows paths only).
 
-The arg `sep` can be `nil`, `true` (platform default), `'\\'`, `'/'`,
-or `1` (remove duplicate separators without normalizing them).
+The arg `sep` can be `nil` (detect), `true` (set to `default_sep`), `false`
+(set to `default_sep` but only if mixed), `'\\'` or `'/'` (set specifically),
+or `nil` when `empty_names` is `false` (collapse duplicate separators only).
+`default_sep` defaults to the platform separator. If `empty_names` is `true`,
+the separators are not collapsed.
 
 __NOTE:__ Setting the separator as `\` on a UNIX path may result in an
 invalid path because `\` is a valid character in UNIX filenames.
+
+## `path.basename(s, [pl]) -> s`
+
+Get the last component from a path.
+If the path ends with a separator then the empty string is returned.
+
+## `path.splitext(s, [pl]) -> name, ext`
+
+Split a path's basename into the name and extension parts like so:
+
+  * `a.txt'` -> `'a'`, `'txt'`
+  * `'.bashrc'' -> `'.bashrc'`, `nil`
+  * `a'` -> `'a'`, `nil`
+  * `'a.'` -> `'a'`, `''`
+
+## `path.dirname(s, [pl]) -> s`
+
+Get the path without basename and separator. If the path ends with a
+separator then the whole path without the separator is returned.
+
+## `path.gsplit(s, [pl], [full]) -> iter() -> s, sep`
+
+Iterate over a path's local components (that is excluding prefixes like
+`\\server` or `C:`). Pass `true` to the `full` arg to iterate over the
+whole unparsed path. For absolute paths, the first iteration is
+`'', <root_separator>`. Empty names are not iterated. Instead, consecutive
+separators are retured as one. Concatenating all the path components and
+separators together always results in the exact original path.
+
+## `path.normalize(s, [pl], [opt]) -> s`
+
+Normalize a path by removing `.` dirs, removing unnecessary `..` dirs
+(careful: this doesn't work if there are symlinks on the path!), collapsing,
+normalizing or changing the separator (for Windows paths), converting
+between Windows long (`\\?\`, `\\?\UNC\`) and normal paths.
+
+The `opt` arg controls the normalization:
+
+  * `dot_dirs` - `true` to keep `.` dirs.
+  * `dot_dot_dirs` - `true` to keep the `..` dirs.
+  * `empty_names` - `true` to keep consecutive separators.
+  * `separator` - `true` to set to default, `false/nil` to set to default
+  only if mixed, `'\\'`, `'/'` to set specifically.
+  * `default_separator` - default separator (defaults to the platform
+  separator).
 
 ## `path.commonpath(p1, p2, [pl]) -> s`
 
 Get the common base path (including the end separator) between two paths.
 
-## `path.basename(s, [pl]) -> s`
-
-Get the last component from a path.
-If the path ends in a separator then the empty string is returned.
-
-## `path.dirname(s, [pl]) -> s`
-
-Get the path without basename and separator. If the path ends in a separator
-then the whole path without the separator is returned.
-
-## `path.splitext(s, [pl]) -> name, ext`
-
-Split a path's filename into the name and extension parts like so:
-
-* `a.txt'` -> `'a'`, `'txt'`
-* `'.bashrc'' -> `'.bashrc'`, `nil`
-* `a'` -> `'a'`, `nil`
-* `'a.'` -> `'a'`, `''`
-
-## `path.abs(s, pwd) -> s`
-
-Convert a relative path to an absolute path given a base dir.
+__BUG:__ The case-insensitive comparison for Windows doesn't work with
+paths with non-ASCII characters (a utf8 module is needed for that).
+Proper lowercase your paths before using this function.
 
 ## `path.rel(s, pwd) -> s`
 
 Convert an absolute path into relative path which is relative to `pwd`.
 
-## `path.normalize(s, [pl], [opt]) -> s`
+## `path.combine(s1, s2, pl) -> s`
 
-Normalize a path in various ways, depending on `opt`:
+Combine two paths if possible (return `nil, err` if not). Supported
+combinations are between types `rel` and anything except `dev_alias`,
+between `abs_nodrive` and `rel_drive`, and between `rel_drive` and `abs`
+or `abs_long`. The order of the arguments doesn't matter.
 
-  * `dot_dirs`
-  * `dot_dot_dirs`
-  *
+## `path.abs(s, pwd) -> s`
+
+Convert a relative path to an absolute path given a base dir.
 
 ## `path.filename(s, [pl], [repl]) -> s`
 
