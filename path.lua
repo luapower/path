@@ -490,19 +490,6 @@ function path.filename(s, pl, repl)
 	return s
 end
 
-function path.pathname(s, pl, repl)
-	local t = {}
-	for filename in path.gsplit(s, pl) do
-		local name, err = path.filename(s, pl, repl)
-		if err and not repl then
-			return nil, err
-		end
-		t[#t+1] = name
-	end
-	return path.join(t, path.separator(s, pl) or path.separator(pl))
-end
-
-
 --[=[
 --if allow_long and type == 'abs' and #path + 1 > 260 then
 --if allow_long and #path + 1 > 260 then
