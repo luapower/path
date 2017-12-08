@@ -183,7 +183,7 @@ paths come from the same API.
 
 ### `path.rel(s, pwd) -> s`
 
-Convert an absolute path into relative path which is relative to `pwd`.
+Convert an absolute path into a relative path which is relative to `pwd`.
 
 ### `path.combine(s1, s2, pl) -> s`
 
@@ -194,7 +194,8 @@ or `abs_long`. The order of the arguments doesn't matter.
 
 ### `path.abs(s, pwd) -> s`
 
-Convert a relative path to an absolute path given a base dir.
+Convert a relative path to an absolute path given a base dir
+(this is currently an alias of `path.combine()`).
 
 ### `path.filename(s, [pl], [repl]) -> s|nil`
 
