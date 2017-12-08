@@ -22,6 +22,7 @@ and UNC paths.
 `path.separator(s, [pl], [sep], ...) -> s`       detect/set the path separator
 `path.basename(s, [pl]) -> s`                    get the last component from a path
 `path.splitext(s, [pl]) -> name, ext`            split path's basename into name and extension
+`path.ext(s, [pl]) -> s`                         return only the extension from `path.splitext()`
 `path.dirname(s, [pl]) -> s`                     get the path without basename
 `path.gsplit(s, [pl], [full]) ->iter() ->s,sep`  iterate over path's components
 `path.normalize(s, [pl], [opt]) -> s`            normalize a path in various ways
@@ -54,7 +55,7 @@ Get the path type which can be:
   * `'abs'` - `C:\path` (Windows) or `/path` (UNIX)
   * `'abs_long'` - `\\?\C:\path` (Windows)
   * `'abs_nodrive'` - `\path` (Windows)
-  * `'rel'` - `a\b`, `a/b`, `''`, etc. (Windows, UNIX)
+  * `'rel'` - `a\b`, `a/b`, `''`, `.`, etc. (Windows, UNIX)
   * `'rel_drive'` - `C:a\b` (Windows)
   * `'unc'` - `\\server\share\path` (Windows)
   * `'unc_long'` - `\\?\UNC\server\share\path` (Windows)
@@ -62,7 +63,7 @@ Get the path type which can be:
   * `'dev'` - `\\.\path` (Windows)
   * `'dev_alias'`: `CON`, `c:\path\nul.txt`, etc. (Windows)
 
-The empty path (`''`) comes off as type `'rel'`.
+The empty path (`''`, which is technically invalid) comes off as type `'rel'`.
 
 The only paths that are portable between Windows and UNIX (Linux, OSX)
 without translation are type `'rel'` paths using forward slashes only which
@@ -86,7 +87,7 @@ Check if a path is an absolute path or not, and if it's empty or not.
 
 __NOTE:__ Absolute paths for which their local path is `''` are actually
 invalid (currently only incomplete UNC paths like `\\server` or `\\?` can be
-like that) but the function doesn't check for that specifically.
+like that). For those paths `is_empty` is `nil`.
 
 ## `path.endsep(s, [pl], [sep]) -> s, success`
 
@@ -98,15 +99,19 @@ separator is returned (`nil` if missing), otherwise it is added or removed
 relative path or trying to remove it from an absolute empty path, which are
 not allowed.
 
+Multiple consecutive separators are treated as one in that they
+are returned together and are replaced together.
+
 ## `path.separator(s, [pl], [sep], [default_sep], [empty_names]) -> s`
 
 Detect or set the a path's separator (for Windows paths only).
 
 The arg `sep` can be `nil` (detect), `true` (set to `default_sep`), `false`
 (set to `default_sep` but only if mixed), `'\\'` or `'/'` (set specifically),
-or `nil` when `empty_names` is `false` (collapse duplicate separators only).
-`default_sep` defaults to the platform separator. If `empty_names` is `true`,
-the separators are not collapsed.
+or `nil` when `empty_names` is `false` (collapse duplicate separators
+only). `default_sep` defaults to the platform separator.
+Unless `empty_names` is `true`, consecutive separators are collapsed
+into the first one.
 
 __NOTE:__ Setting the separator as `\` on a UNIX path may result in an
 invalid path because `\` is a valid character in UNIX filenames.
@@ -120,15 +125,20 @@ If the path ends with a separator then the empty string is returned.
 
 Split a path's basename into the name and extension parts like so:
 
-  * `a.txt'` -> `'a'`, `'txt'`
-  * `'.bashrc'' -> `'.bashrc'`, `nil`
-  * `a'` -> `'a'`, `nil`
-  * `'a.'` -> `'a'`, `''`
+  * `a.txt'` -> `'a', 'txt'`
+  * `'.bashrc'` -> `'.bashrc', nil`
+  * `a'` -> `'a', nil`
+  * `'a.'` -> `'a', ''`
+
+## `path.ext(s, [pl]) -> s`
+
+Return only the extension from `path.splitext()`.
 
 ## `path.dirname(s, [pl]) -> s`
 
-Get the path without basename and separator. If the path ends with a
-separator then the whole path without the separator is returned.
+Get the path without basename and last separator. If the path ends with a
+separator then the whole path without the separator is returned. Multiple
+consecutive separators are treated as one.
 
 ## `path.gsplit(s, [pl], [full]) -> iter() -> s, sep`
 
@@ -136,8 +146,8 @@ Iterate over a path's local components (that is excluding prefixes like
 `\\server` or `C:`). Pass `true` to the `full` arg to iterate over the
 whole unparsed path. For absolute paths, the first iteration is
 `'', <root_separator>`. Empty names are not iterated. Instead, consecutive
-separators are retured as one. Concatenating all the path components and
-separators together always results in the exact original path.
+separators are retured together. Concatenating all the iterated path
+components and separators always results in the exact original path.
 
 ## `path.normalize(s, [pl], [opt]) -> s`
 
@@ -150,19 +160,26 @@ The `opt` arg controls the normalization:
 
   * `dot_dirs` - `true` to keep `.` dirs.
   * `dot_dot_dirs` - `true` to keep the `..` dirs.
-  * `empty_names` - `true` to keep consecutive separators.
-  * `separator` - `true` to set to default, `false/nil` to set to default
-  only if mixed, `'\\'`, `'/'` to set specifically.
-  * `default_separator` - default separator (defaults to the platform
-  separator).
+  * `separator`, `default_separator`, `empty_names` - args to pass to
+  `path.separator()` (`separator` defaults to `false`, use `'leave'`
+  to avoid normalizing the separators)
+  * `endsep` - `sep` arg to pass to `path.endsep()` (`endsep` defaults
+  to `false`, use `'leave'` to avoid removing the end separator)
+  * `long` - `'auto'` (default) convert `'abs'` paths to `'abs_long'` when
+  they are too long and viceversa when they are short enough (pass `true` or
+  `false` to this option to force a conversion instead). Separators are
+  automatically normalized to `\` when converting to a long path. Make sure
+  to have dot dirs removed too when using long paths.
 
 ## `path.commonpath(p1, p2, [pl]) -> s`
 
 Get the common base path (including the end separator) between two paths.
 
 __BUG:__ The case-insensitive comparison for Windows doesn't work with
-paths with non-ASCII characters (a utf8 module is needed for that).
-Proper lowercase your paths before using this function.
+paths with non-ASCII characters because it's made with `string.lower()`.
+Proper lowercase your paths before using this function, or patch
+`string.lower()` to support utf8 lowercasing. This is not an issue if both
+paths come from the same API.
 
 ## `path.rel(s, pwd) -> s`
 

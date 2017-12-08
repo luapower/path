@@ -62,15 +62,64 @@ test('', 'unix', false, true)
 
 --TODO: `path.endsep(s, [pl], [sep]) -> s, success`
 
+local function test(s, s2, success2, pl, sep)
+	local s1, success1 = path.endsep(s, pl, sep)
+	print('endsep', s, pl, sep, '->', s1, success1)
+	assert(s1 == s2)
+	assert(success1 == success2)
+end
+
+test('', nil, nil, 'win', nil)
+test('/', '/', nil, 'win', nil)
+test('/', '/', nil, 'unix', nil)
+test('C:', nil, nil, 'win', nil)
+test('C:\\', '\\', nil, 'win', nil)
+
+test('a', 'a/', true, 'win', '/') --add specific
+test('a', 'a\\', true, 'unix', '\\') --add specific (invalid but allowed)
+test('a', 'a\\', true, 'win', true) --add default
+test('a/b', 'a/b/', true, 'win', true) --add detected
+test('a/', 'a', true, 'win', '') --remove
+test('a/', 'a', true, 'win', false) --remove
+test('a/', 'a/', true, 'win', '\\') --already there, not changing
+test('C:', 'C:', false, 'win', '/') --refuse to add
+test('C:/', 'C:/', false, 'win', '') --refuse to remove
+
 --separator ------------------------------------------------------------------
 
 local function test(s, s2, pl, sep, default_sep, empty_names)
 	local s1 = path.separator(s, pl, sep, default_sep, empty_names)
-	print('sep', s, pl, which, sep, default_sep, empty_names, '->', s1)
+	print('sep', s, pl, sep, default_sep, empty_names, '->', s1)
 	assert(s1 == s2)
 end
 
---TODO
+test('', nil, 'win')
+test('a', nil, 'win')
+test('/', '/', 'win')
+test('\\', '\\', 'win')
+test('C:', nil, 'win')
+test('\\\\server', nil, 'win') --invalid UNC
+test('a/b\\c', nil, 'win')
+test('a/b\\c', '/', 'unix')
+
+test('', '', 'win', true)
+test('a/b', 'a\\b', 'win', true) --default
+test('a\\b', 'a/b', 'win', true, '/') --specific default
+test('a/b/c', 'a/b/c', 'win', false) --default if mixed
+test('a/b\\c', 'a\\b\\c', 'win', false) --default if mixed
+test('a/b\\c', 'a/b/c', 'win', false, '/') --specific default if mixed
+test('a/b\\c', 'a/b/c', 'win', '/') --specific
+test('a/b/c', 'a\\b\\c', 'win', '\\') --specific (invalid but allowed)
+
+test('a//b\\\\\\c', 'a/b\\c', 'win', nil, nil, false) --collapse only
+--don't collapse, default if mixed, default
+test('a//b\\\\\\c', 'a\\\\b\\\\\\c', 'win', true, nil, true)
+--don't collapse, default if mixed, specific
+test('a//b\\\\\\c', 'a//b///c', 'win', '/', nil, true)
+--don't collapse, default if mixed
+test('a//b\\\\\\c', 'a\\\\b\\\\\\c', 'win', false, nil, true)
+--don't collapse, default if mixed, specific default
+test('a//b\\\\\\c', 'a//b///c', 'win', false, '/', true)
 
 --basename -------------------------------------------------------------------
 
@@ -86,6 +135,10 @@ test('a/'  , 'win', '')
 test('/a'  , 'win', 'a')
 test('a/b' , 'win', 'b')
 test('a/b/', 'win', '')
+
+test('a\\b\\', 'unix', 'a\\b\\')
+test('a/b', 'unix', 'b')
+test('a/b/', 'unix', '')
 
 --splitext -------------------------------------------------------------------
 
@@ -112,27 +165,122 @@ local function test(s, pl, s2)
 	assert(s1 == s2)
 end
 
---TODO
+test('', 'win', '')
+test('a', 'win', '')
+test('aa', 'win', '')
+test('a/b', 'win', 'a')
+test('aa/bb', 'win', 'aa')
+test('C:/aa/bb', 'win', 'C:/aa')
+test('C:a', 'win', 'C:')
+test('C:/', 'win', 'C:/')
+test('C:/a', 'win', 'C:/')
+test('\\aa', 'unix', '')
+test('a/b', 'unix', 'a')
+test('/b', 'unix', '/')
+test('/', 'win', '/')
+test('\\', 'win', '\\')
+test('/aa', 'win', '/')
 
 --gsplit ---------------------------------------------------------------------
 
---TODO `path.gsplit(s, [pl], [full]) ->iter() ->s,sep`
+function test(s, pl, full, t2)
+	local t1 = {}
+	for s, sep in path.gsplit(s, pl, full) do
+		table.insert(t1, s)
+		table.insert(t1, sep)
+	end
+	local _ = require'pp'.format
+	print('gsplit', s, pl, full, '->', _(t1))
+	assert(_(t1) == _(t2))
+end
+
+test('', 'win', nil, {})
+test('/', 'win', nil, {'', '/'})
+test('/a', 'win', nil, {'', '/', 'a', ''})
+test('/a/', 'win', nil, {'', '/', 'a', '/'})
+test('\\/a\\/', 'win', nil, {'', '\\/', 'a', '\\/'})
+test('C:', 'win', nil, {})
+test('C:\\a/b', 'win', nil, {'', '\\', 'a', '/', 'b', ''})
+test('a/b\\c', 'unix', nil, {'a', '/', 'b\\c', ''})
 
 --normalize ------------------------------------------------------------------
 
---TODO `path.normalize(s, [pl], [opt]) -> s`
-
-local function test(s, pl, opt, r2)
-	local r1 = path.normalize(s, pl, opt)
-	print('normal', s, pl, require'pp'.format(opt), '->', r1)
-	assert(r1 == r2)
+local function test(s, pl, opt, s2)
+	local s1 = path.normalize(s, pl, opt)
+	print('normal', s, pl, 'opt', '->', s1)
+	assert(s1 == s2)
 end
+
+--remove `.`
+local opt = {dot_dot_dirs = true, endsep = 'leave', separator = 'leave'}
+test('.', 'win', opt, '.')
+test('./', 'win', opt, './')
+test('.\\', 'win', opt, '.\\') --original endsep is used
+test('./.', 'win', opt, '.')
+test('./.\\', 'win', opt, '.\\') --original endsep is used
+test('/.', 'win', opt, '/')
+test('\\./', 'win', opt, '\\') --root slash kept
+test('/.\\.', 'win', opt, '/') --root slash kept
+test('/a/.', 'win', opt, '/a')
+test('/./a', 'win', opt, '/a')
+test('./a', 'win', opt, 'a')
+test('a/.', 'win', opt, 'a')
+test('a\\.', 'win', opt, 'a')
+test('a\\./', 'win', opt, 'a\\')
+test('a/b\\c', 'win', opt, 'a/b\\c')
+test('a\\././b///', 'win', opt, 'a\\b///')
+test('a/.\\.\\b\\\\', 'win', opt, 'a/b\\\\')
+
+--remove `..`
+local opt = {dot_dirs = true, endsep = 'leave', separator = 'leave'}
+test('a/b/..', 'win', opt, 'a') --remove endsep from leftover
+test('a/b/c/..', 'win', opt, 'a/b') --remove endsep from leftover
+test('a/..', 'win', opt, '.') --no leftover to remove endsep from
+test('\\a/..', 'win', opt, '\\') --can't remove endsep from empty abs path
+test('\\a/../', 'win', opt, '\\') --keep endsep
+test('\\../', 'win', opt, '\\') --remove from root, keep endsep
+test('a\\b/../', 'win', opt, 'a\\') --keep endsep
+test('a/../', 'win', opt, './') --no leftover to see endsep
+test('C:/a/b/..', 'win', opt, 'C:/a')
+test('C:/a/b/c/../..', 'win', opt, 'C:/a')
+--remove till empty
+test('a/..', 'win', opt, '.')
+test('a/b/../..', 'win', opt, '.')
+test('C:/a/..', 'win', opt, 'C:/') --keep endsep
+test('C:/a/b/../..', 'win', opt, 'C:/') --keep endsep
+--one `..` too many from rel paths
+test('..', 'win', opt, '..')
+test('../', 'win', opt, '../')
+test('../..', 'win', opt, '../..')
+test('../..\\', 'win', opt, '../..\\')
+test('a/..\\', 'win', opt, '.\\')
+test('a/b/../../..', 'win', opt, '..')
+--one `..` too many from abs paths
+test('/..', 'win', opt, '/')
+test('/..\\', 'win', opt, '/')
+test('/../..', 'win', opt, '/')
+test('/../..\\', 'win', opt, '/')
+test('C:/a/b/../../..', 'win', opt, 'C:/')
+--skip `.` dirs when removing
+test('a/b/./././..', 'win', opt, 'a/././.')
+test('a/./././..', 'win', opt, '././.')
+test('./././..', 'win', opt, './././..')
+test('/./././..', 'win', opt, '/./././..')
+
+--default options: remove `.` and `..` and end-slash, set-sep-if-mixed.
+test('C:///a/././b/x/../c\\d', 'win', nil, 'C:\\a\\b\\c\\d')
+--default options: even when not mixed, separators are collapsed.
+test('C:///a/././b/x/../c/d', 'win', nil, 'C:/a/b/c/d')
+
+--long paths
+local long = {long = 'auto', separator = 'leave', endsep = 'leave'}
+test('C:'..('/a/b'):rep(65), 'win', long, '\\\\?\\C:'..('\\a\\b'):rep(65))
 
 --commonpath -----------------------------------------------------------------
 
 local function test(a, b, pl, c2)
 	local c1 = path.commonpath(a, b, pl)
-	print('commpre', a, b, pl, '->', c1)
+	print('commonp', a, b, pl, '->', c1)
 	assert(c1 == c2)
 end
 
@@ -168,6 +316,8 @@ local function test(s, pwd, pl, r2)
 	assert(r1 == r2)
 end
 
+--TODO
+
 --combine (& implicitly abs) -------------------------------------------------
 
 local function test(s, pwd, pl, r2)
@@ -176,10 +326,9 @@ local function test(s, pwd, pl, r2)
 	assert(r1 == r2)
 end
 
+--TODO
+
 --filename -------------------------------------------------------------------
 
 --TODO `path.filename(s, [pl], [repl]) -> s`
-
-
-
 

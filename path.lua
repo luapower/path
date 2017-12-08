@@ -61,7 +61,7 @@ function path.type(s, pl)
 			return s:find'^[\\/]' and 'abs_nodrive' or 'rel'
 		end
 	else
-		return s:find'^/' and 'abs' or 'rel'
+		return s:byte(1) == ('/'):byte(1) and 'abs' or 'rel'
 	end
 end
 
@@ -70,24 +70,28 @@ end
 --NOTE: UNC paths are not validated and can have and empty server or path.
 function path.parse(s, pl)
 	local type = path.type(s, pl)
-	if win(pl) and (type == 'abs' or type == 'rel_drive') then
-		return type, s:sub(3), s:sub(1,1) -- \path, drive
-	elseif type == 'abs_long' then
-		return type, s:sub(3+4), s:sub(1+4,1 +4) -- \path, drive
-	elseif type == 'unc' then
-		local server, path = s:match'^..([^\\]*)(.*)$'
-		return type, path, server
-	elseif type == 'unc_long' then
-		local server, path = s:match'^........([^\\]*)(.*)$'
-		return type, path, server
-	elseif type == 'dev' then
-		return type, s:sub(4) -- \path
-	elseif type == 'dev_alias' then
-		return type, path.dev_alias(s) -- CON, NUL, ...
-	elseif type == 'global' then
-		return type, s:sub(4) -- \path
-	else --type rel, abs_nodrive, abs/unix (nothing to split)
-		return type, s
+	if win(pl) then
+		if type == 'rel' or type == 'abs_nodrive' then
+			return type, s -- nothing to split
+		elseif type == 'abs' or type == 'rel_drive' then
+			return type, s:sub(3), s:sub(1,1) -- \path, drive
+		elseif type == 'abs_long' then
+			return type, s:sub(3+4), s:sub(1+4,1 +4) -- \path, drive
+		elseif type == 'unc' then
+			local server, path = s:match'^..([^\\]*)(.*)$'
+			return type, path, server
+		elseif type == 'unc_long' then
+			local server, path = s:match'^........([^\\]*)(.*)$'
+			return type, path, server
+		elseif type == 'dev' then
+			return type, s:sub(4) -- \path
+		elseif type == 'dev_alias' then
+			return type, path.dev_alias(s) -- CON, NUL, ...
+		elseif type == 'global' then
+			return type, s:sub(4) -- \path
+		end
+	else
+		return type, s --unix path: nothing to split
 	end
 end
 
@@ -145,55 +149,60 @@ local function detect_sep(p, win)
 end
 
 --get/add/remove ending separator.
+local function set_endsep(type, p, win, sep)
+	local _, isempty = isabs(type, p, win)
+	if isempty then --refuse to change the ending slash on empty paths
+		return
+	elseif sep == false or sep == '' then --remove it
+		return p:gsub(win and '[\\/]+$' or '/+$', '')
+	elseif p:find(win and '[\\/]$' or '/$') then --add it/already set
+		return p
+	else
+		if sep == true then
+			sep = detect_sep(p, win) or (win and '\\' or '/')
+		end
+		assert(sep == '\\' or sep == '/', 'invalid separator')
+		return p .. sep
+	end
+end
 function path.endsep(s, pl, sep)
 	local win = win(pl)
 	local type, p, drive = path.parse(s, pl)
 	if sep == nil then
 		return p:match(win and '[\\/]+$' or '/+$')
 	else
-		local _, isempty = isabs(type, p, win)
-		if isempty then --refuse to change the ending slash on empty paths
-			return s, false
-		elseif sep == false or sep == '' then --remove it
-			p = p:gsub(win and '[\\/]+$' or '/+$', '')
-			return path.format(type, p, drive, pl), true
-		elseif p:find(win and '[\\/]$' or '/$') then --add it/already set
-			return s, true
-		else
-			if sep == true then
-				sep = detect_sep(p, win) or (win and '\\' or '/')
-			end
-			assert(sep == '\\' or sep == '/', 'invalid separator')
-			p = p .. sep
-			return path.format(type, p, drive, pl), true
-		end
+		local p = set_endsep(type, p, win, sep)
+		return p and path.format(type, p, drive, pl) or s, p and true or false
 	end
 end
 
 --detect or set the a path's separator (for Windows paths only).
 --NOTE: setting '\' on a UNIX path may result in an invalid path because
 --`\` is a valid character in UNIX filenames!
+local function set_separator(p, win, sep, default_sep, empty_names)
+	local dsep = default_sep or (win and '\\' or '/')
+	if sep == true then --set to default
+		sep = dsep
+	elseif sep == false then --set to default only if mixed
+		sep = detect_sep(p, win) or dsep
+	elseif sep == nil then --collapse only
+		sep = '%1'
+	else
+		assert(sep == '\\' or sep == '/', 'invalid separator')
+	end
+	if empty_names then
+		return p:gsub(win and '[\\/]' or '/', sep)
+	else
+		return p:gsub(win and '([\\/])[\\/]*' or '(/)/*', sep)
+	end
+end
 function path.separator(s, pl, sep, default_sep, empty_names)
 	local win = win(pl)
 	local type, p, drive = path.parse(s, pl)
 	if sep == nil and empty_names == nil then
 		return detect_sep(p, win)
 	else
-		local dsep = default_sep or (win and '\\' or '/')
-		if sep == true then --default
-			sep = dsep
-		elseif sep == false then --default if mixed
-			sep = detect_sep(p, win) or dsep
-		elseif sep == nil then --collapse only
-			sep = '%1'
-		else
-			assert(sep == '\\' or sep == '/', 'invalid separator')
-		end
-		if empty_names then
-			p = p:gsub(win and '[\\/]' or '/', sep)
-		else
-			p = p:gsub(win and '([\\/])[\\/]*' or '(/)/*', sep)
-		end
+		p = set_separator(p, win, sep, default_sep, empty_names)
 		return path.format(type, p, drive, pl)
 	end
 end
@@ -216,16 +225,24 @@ function path.splitext(s, pl)
 	return name, ext
 end
 
+function path.ext(s, pl)
+	local _, ext = path.splitext(s, pl)
+	return ext
+end
+
 --get a path without basename and separator. if the path ends with
 --a separator then the whole path without the separator is returned.
 function path.dirname(s, pl)
 	local type, p, drive = path.parse(s, pl)
-	local i = p:match(win(pl) and '[\\/]*()[^\\/]*$' or '/*()[^/]*$')
+	local i1, i2 = p:match(win(pl)
+		and '()[\\/]*()[^\\/]*$' or '()/*()[^/]*$')
+	local i = i1 == 1 and i2 or i1 --if it starts with a slash, include it
 	return path.format(type, p:sub(1, i-1), drive, pl)
 end
 
 --iterate over a path's components and separators.
 function path.gsplit(s, pl, full)
+	local win = win(pl)
 	local p = full and s or select(2, path.parse(s, pl))
 	local root_sep = p:match(win and '^[\\/]+' or '^/+')
 	local next_pc = p:gmatch(win and '([^\\/]+)([\\/]*)' or '([^/]+)(/*)')
@@ -240,46 +257,93 @@ function path.gsplit(s, pl, full)
 	end
 end
 
+local function iif(a, b, c)
+	if a == b then
+		return c
+	else
+		return a
+	end
+end
+
 -- remove `.` dirs (opt.dot_dirs)
 -- remove unnecessary `..` dirs (opt.dot_dot_dirs)
--- remove duplicate separators (opt.empty_names)
--- normalize the path separator (opt.separator, opt.default_separator)
+-- normalize separator (opt.separator, opt.default_separator, opt.empty_names)
 -- add/remove ending separator (opt.endsep)
 -- convert between long and short Windows path encodings (opt.long)
 function path.normalize(s, pl, opt)
 	opt = opt or {}
 	local win = win(pl)
 	local type, p, drive = path.parse(s, pl)
-	local nsep = opt.separator
-	if nsep == true or (not nsep and not detect_sep(p, win)) then
-		nsep = opt.default_separator or (win and '\\' or '/')
-	end
+
 	local t = {} --{dir1, sep1, ...}
+	local lastsep --last separator that was not added to the list
 	for s, sep in path.gsplit(p, pl, true) do
-		if not opt.dot_dirs and s == '.' then
-			--skip adding the `.` dirs
-		elseif not opt.dot_dot_dirs and s == '..' and #t > 1 then
-			--find the last dir past any `.` dirs.
+		if s == '.' and not opt.dot_dirs then
+			--skip adding the `.` dir and the separator following it
+			lastsep = sep
+		elseif s == '..' and not opt.dot_dot_dirs and #t > 0 then
+			--find the last dir past any `.` dirs, in case opt.dot_dirs = true.
 			local i = #t-1
 			while t[i] == '.' do
 				i = i - 2
 			end
-			--remove the last dir that's not `..` or the root element.
-			if i > 1 and t[i] ~= '..' then
+			--remove the last dir (and the separator following it)
+			--that's not `..` and it's not the root element.
+			if i > 0 and ((i > 1 or t[i] ~= '') and t[i] ~= '..') then
 				table.remove(t, i)
 				table.remove(t, i)
+				lastsep = sep
+			elseif #t == 2 and t[1] == '' then
+				--skip `..` after the root slash
+				lastsep = sep
+			else
+				table.insert(t, s)
+				table.insert(t, sep)
 			end
 		else
-			if #sep > 0 and nsep then --normalize seps or set to single sep
-				sep = opt.empty_names and nsep:rep(#sep) or nsep
-			elseif #sep > 1 and not opt.empty_names then --collapse seps
-				sep = sep:sub(1, 1)
-			end
 			table.insert(t, s)
 			table.insert(t, sep)
+			lastsep = nil
 		end
 	end
-	return path.format(type, table.concat(t), drive, pl)
+	if #t == 0 then --the empty rel path ('') is not a valid path. fix that.
+		table.insert(t, '.')
+		table.insert(t, lastsep)
+	elseif lastsep == '' and (#t > 2 or t[1] ~= '') then
+		--if there was no end separator originally before removing path
+		--components, remove the left over separator now.
+		table.remove(t)
+	end
+	p = table.concat(t)
+
+	if opt.separator ~= 'leave' then
+		p = set_separator(p, win,
+			iif(iif(opt.separator, nil, false), 1, nil),
+			opt.default_separator,
+			opt.empty_names)
+	end
+
+	if opt.endsep ~= 'leave' then
+		p = set_endsep(type, p, win, iif(opt.endsep, nil, false)) or p
+	end
+
+	s = path.format(type, p, drive, pl)
+
+	if win and opt.long ~= 'leave' then
+		local long = iif(opt.long, nil, 'auto')
+		if type == 'abs'
+			and ((long == 'auto' and #s > 259) or long == true)
+		then
+			p = p:gsub('/+', '\\') --TODO: this might create a smaller path
+			s = path.format('abs_long', p, drive, pl)
+		elseif type == 'abs_long'
+			and ((long == 'auto' and #s <= 259 + 4) or long == false)
+		then
+			s = path.format('abs', p, drive, pl)
+		end
+	end
+
+	return s
 end
 
 --get the common base path (including the end separator) between two paths.
@@ -303,11 +367,11 @@ function path.commonpath(s1, s2, pl)
 	if t1 ~= t2 or d1 ~= d2 or p1 == '' or p2 == '' then
 		return path.format(t, '', d, pl)
 	end
-	local sep = (win and '\\' or '/'):byte(1, 1)
+	local sep = (win and '\\' or '/'):byte(1)
 	local si = 0 --index where the last common separator was found
 	for i = 1, #p + 1 do
-		local c1 = p1:byte(i, i)
-		local c2 = p2:byte(i, i)
+		local c1 = p1:byte(i)
+		local c2 = p2:byte(i)
 		local sep1 = c1 == nil or c1 == sep
 		local sep2 = c2 == nil or c2 == sep
 		if sep1 and sep2 then
@@ -320,6 +384,18 @@ function path.commonpath(s1, s2, pl)
 	return path.format(t, p, d, pl)
 end
 
+local function depth(p, win)
+	local n = 0
+	for _ in p:gmatch(win and '()[^\\/]+' or '()[^/]+') do
+		n = n + 1
+	end
+	return n
+end
+function path.depth(s, pl)
+	local _, p = path.parse(s, pl)
+	return depth(p, win(pl))
+end
+
 --transform an absolute path into a relative path which is relative to `pwd`.
 function path.rel(s, pwd, pl)
 	local type, p, drive = path.parse(s, pl)
@@ -327,10 +403,13 @@ function path.rel(s, pwd, pl)
 	local prefix = path.commonpath(p, pwd, pl)
 	--count the dir depth in pwd after the prefix.
 	local pwd_suffix = pwd:sub(#prefix + 1)
+	local n = depth(pwd_suffix, win)
+	--[[
 	local n = 0
 	for _ in pwd_suffix:gmatch(win and '()[^\\/]+' or '()[^/]+') do
 		n = n + 1
 	end
+	]]
 	p = p:sub(#prefix + 1)
 	p = ('../'):rep(n) .. p
 	return path.format(type, p, drive, pl)
