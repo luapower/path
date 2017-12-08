@@ -190,7 +190,8 @@ Convert an absolute path into a relative path which is relative to `pwd`.
 Combine two paths if possible (return `nil, err` if not). Supported
 combinations are between types `rel` and anything except `dev_alias`,
 between `abs_nodrive` and `rel_drive`, and between `rel_drive` and `abs`
-or `abs_long`. The order of the arguments doesn't matter.
+or `abs_long`. Arguments can be given in any order when the paths can only
+be combined in one way.
 
 ### `path.abs(s, pwd) -> s`
 
