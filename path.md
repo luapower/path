@@ -128,7 +128,7 @@ Get/set a Windows long absolute path (one starting with `\\?\C:\`). If
 `long` is `nil`, returns whether the path is a long or short Windows absolute
 path (returns `nil` for all other kinds of paths). Otherwise it converts the
 path, in which case `long` can be `true` (convert to long path), `false`
-(convert to short path)`, or `'auto'` (convert to long style if too long,
+(convert to short path) or `'auto'` (convert to long style if too long,
 or to short style if short enough).
 
 ### `path.file(s, [pl]) -> s`
