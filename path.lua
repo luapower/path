@@ -351,7 +351,7 @@ function path.normalize(s, pl, opt)
 	p = table.concat(t)
 
 	if opt.sep ~= 'leave' then
-		p = set_sep(p, win, iif(iif(opt.sep, nil, false),
+		p = set_sep(p, win, iif(opt.sep, nil, false),
 			opt.default_sep, opt.empty_names)
 	end
 
