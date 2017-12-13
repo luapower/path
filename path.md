@@ -154,7 +154,7 @@ Return only the extension from `path.nameext()`.
 Get the path without the last component and separator. If the path ends with
 a separator then the whole path without the separator is returned. Multiple
 consecutive separators are treated as one. Returns `nil` for `''`, `'.'`,
-`'C:', `'/'`, `'C:\\'` and `\\server\`. Returns `'.'` for simple filenames.
+`'C:'`, `'/'`, `'C:\\'` and `\\server\`. Returns `'.'` for simple filenames.
 
 ### `path.gsplit(s, [pl], [full]) -> iter() -> s, sep`
 
@@ -175,18 +175,15 @@ and normal paths.
 
 The `opt` arg controls the normalization:
 
-  * `dot_dirs` - `true` to keep `.` dirs.
-  * `dot_dot_dirs` - `true` to keep the `..` dirs.
+  * `dot_dirs` - use `true` to keep `.` dirs.
+  * `dot_dot_dirs` - use `true` to keep the `..` dirs.
   * `sep`, `default_sep`, `empty_names` - args to pass to `path.sep()`
   (`sep` defaults to `false`, use `'leave'` to avoid normalizing the
   separators)
-  * `endsep` - `sep` arg to pass to `path.endsep()` (`endsep` defaults
-  to `false`, use `'leave'` to avoid removing any end separator)
-  * `long` - `'auto'` (default) convert `'abs'` paths to `'abs_long'` when
-  they are too long and viceversa when they are short enough (pass `true` or
-  `false` to this option to force a conversion instead). Separators are
-  automatically normalized to `\` when converting to a long path. Make sure
-  to have dot dirs removed too when using long paths.
+  * `endsep` - `sep` arg to pass to `path.endsep()` (defaults to `false`,
+  use `'leave'` to avoid removing any end separator)
+  * `long` - `long` arg to pass to `path.long()` (defaults to `'auto'`,
+  use `'leave'` to avoid converting between short and long paths)
 
 __NOTE:__ If normalization results in the empty relative path `''`, then
 `'.'` is returned instead.
