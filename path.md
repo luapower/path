@@ -29,7 +29,7 @@ and UNC paths.
 `path.normalize(s, [pl], [opt]) -> s`                normalize a path in various ways
 `path.commonpath(s1, s2, [pl]) -> s|nil`             get the common prefix of two paths
 `path.depth(s, [pl]) -> n`                           get the number of non-empty path components
-`path.combine(p1, p2, [pl], [sep], [dsep]) -> s|nil` combine two paths if possible
+`path.combine(s1, s2, [pl], [sep], [dsep]) -> s|nil` combine two paths if possible
 `path.abs(s, pwd, [pl], [sep], [dsep]) -> s|nil,err` convert relative path to absolute
 `path.rel(s, pwd, [pl], [sep], [dsep]) -> s|nil`     convert absolute path to relative
 `path.filename(s, [pl], [repl]) -> s|nil,err,code`   validate/make-valid filename
