@@ -175,7 +175,7 @@ function path.endsep(s, pl, sep, default_sep)
 	end
 end
 
---detect or set the a path's separator (for Windows paths only).
+--detect or set a path's separator (for Windows paths only).
 --NOTE: setting '\' on a UNIX path may result in an invalid path because
 --`\` is a valid character in UNIX filenames!
 local function set_sep(p, win, sep, default_sep, empty_names)
